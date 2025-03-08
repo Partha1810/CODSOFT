@@ -1,0 +1,153 @@
+import sqlite3
+from datetime import datetime
+import re
+
+class TaskManager:
+    def __init__(self, db_name="todo_list.db"):
+        self.conn = sqlite3.connect(db_name)
+        self.cursor = self.conn.cursor()
+        self._create_table()
+
+    def _create_table(self):
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS tasks (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                title TEXT NOT NULL,
+                                description TEXT,
+                                due_date TEXT,
+                                priority TEXT,
+                                completed INTEGER DEFAULT 0)''')
+        self.conn.commit()
+
+    def _validate_date(self, date_str):
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', date_str):
+            try:
+                return datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                return None
+        return None
+
+    def _validate_priority(self, priority):
+        if priority.lower() in ("low", "medium", "high"):
+            return priority.lower()
+        return None
+
+    def _get_task_by_id(self, task_id):
+        self.cursor.execute("SELECT * FROM tasks WHERE id=?", (task_id,))
+        return self.cursor.fetchone()
+
+    def display_tasks(self, order_by="priority DESC, due_date ASC"):
+        self.cursor.execute(f"SELECT * FROM tasks ORDER BY {order_by}")
+        tasks = self.cursor.fetchall()
+        if tasks:
+            print("\nTo-Do List:")
+            for task in tasks:
+                status = "Completed" if task[5] else "Pending"
+                print(f"ID: {task[0]} | Title: {task[1]} | Status: {status} | Due: {task[3]} | Priority: {task[4]}")
+        else:
+            print("No tasks found.")
+
+    def add_task(self, title, description, due_date, priority):
+        valid_date = self._validate_date(due_date)
+        valid_priority = self._validate_priority(priority)
+        if valid_date and valid_priority:
+            self.cursor.execute("INSERT INTO tasks (title, description, due_date, priority) VALUES (?, ?, ?, ?)",
+                                (title, description, valid_date, valid_priority))
+            self.conn.commit()
+            print(f"Task '{title}' added successfully.")
+        else:
+            print("Invalid date or priority. Task not added.")
+
+    def edit_task(self, task_id, title=None, description=None, due_date=None, priority=None):
+        task = self._get_task_by_id(task_id)
+        if task:
+            title = title or task[1]
+            description = description or task[2]
+            due_date = self._validate_date(due_date) if due_date else task[3]
+            priority = self._validate_priority(priority) if priority else task[4]
+
+            self.cursor.execute("UPDATE tasks SET title=?, description=?, due_date=?, priority=? WHERE id=?",
+                                (title, description, due_date, priority, task_id))
+            self.conn.commit()
+            print(f"Task ID {task_id} updated successfully.")
+        else:
+            print(f"Task ID {task_id} not found.")
+
+    def delete_task(self, task_id):
+        if self._get_task_by_id(task_id):
+            self.cursor.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+            self.conn.commit()
+            print(f"Task ID {task_id} deleted successfully.")
+        else:
+            print(f"Task ID {task_id} not found.")
+
+    def mark_completed(self, task_id):
+        if self._get_task_by_id(task_id):
+            self.cursor.execute("UPDATE tasks SET completed=1 WHERE id=?", (task_id,))
+            self.conn.commit()
+            print(f"Task ID {task_id} marked as completed.")
+        else:
+            print(f"Task ID {task_id} not found.")
+
+    def close(self):
+        self.conn.close()
+
+def get_user_input(prompt, validation=None):
+    while True:
+        user_input = input(prompt)
+        if validation:
+            validated_input = validation(user_input)
+            if validated_input is not None:
+                return validated_input
+            else:
+                print("Invalid input. Try again.")
+        else:
+            return user_input
+
+def main():
+    task_manager = TaskManager()
+    while True:
+        print("\n--- To-Do List App ---")
+        print("1. Display tasks")
+        print("2. Add new task")
+        print("3. Edit task")
+        print("4. Delete task")
+        print("5. Mark task as completed")
+        print("6. Exit")
+
+        choice = get_user_input("Enter your choice: ")
+
+        if choice == '1':
+            task_manager.display_tasks()
+        elif choice == '2':
+            title = get_user_input("Enter task title: ")
+            description = get_user_input("Enter task description: ")
+            due_date = get_user_input("Enter due date (YYYY-MM-DD): ", validation=task_manager._validate_date)
+            priority = get_user_input("Enter priority (low, medium, high): ", validation=task_manager._validate_priority)
+            task_manager.add_task(title, description, due_date, priority)
+        elif choice == '3':
+            task_manager.display_tasks()
+            task_id = get_user_input("Enter the ID of the task to edit: ", validation=lambda x: int(x) if x.isdigit() else None)
+            if task_manager._get_task_by_id(task_id):
+                new_title = get_user_input("Enter new title (leave blank to keep current): ") or None
+                new_description = get_user_input("Enter new description (leave blank to keep current): ") or None
+                new_due_date = get_user_input("Enter new due date (leave blank to keep current): ", validation=task_manager._validate_date) or None
+                new_priority = get_user_input("Enter new priority (leave blank to keep current): ", validation=task_manager._validate_priority) or None
+                task_manager.edit_task(task_id, new_title, new_description, new_due_date, new_priority)
+        elif choice == '4':
+            task_manager.display_tasks()
+            task_id = get_user_input("Enter the ID of the task to delete: ", validation=lambda x: int(x) if x.isdigit() else None)
+            task_manager.delete_task(task_id)
+        elif choice == '5':
+            task_manager.display_tasks()
+            task_id = get_user_input("Enter the ID of the task to mark as completed: ", validation=lambda x: int(x) if x.isdigit() else None)
+            task_manager.mark_completed(task_id)
+        elif choice == '6':
+            print("Exiting...")
+            break
+        else:
+            print("Invalid choice. Please try again.")
+
+    task_manager.close()
+
+if __name__ == "__main__":
+    main()
