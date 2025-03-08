@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSS Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="calculator">
+        <div class="display" id="display">0</div>
+        <div class="buttons">
+            <div class="row">
+                <button data-value="7">7</button>
+                <button data-value="8">8</button>
+                <button data-value="9">9</button>
+                <button data-operator="/" data-value="/">/</button>
+            </div>
+            <div class="row">
+                <button data-value="4">4</button>
+                <button data-value="5">5</button>
+                <button data-value="6">6</button>
+                <button data-operator="*" data-value="*">x</button>
+            </div>
+            <div class="row">
+                <button data-value="1">1</button>
+                <button data-value="2">2</button>
+                <button data-value="3">3</button>
+                <button data-operator="-" data-value="-">-</button>
+            </div>
+            <div class="row">
+                <button data-value="0">0</button>
+                <button data-clear="C">C</button>
+                <button data-operator="+" data-value="+">+</button>
+                <button data-equals="=">=</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
+    font-family: sans-serif;
+}
+
+.calculator {
+    background-color: #333;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    width: 300px;
+}
+
+.display {
+    width: 100%;
+    padding: 15px;
+    margin-bottom: 10px;
+    border: none;
+    border-radius: 5px;
+    font-size: 1.5rem;
+    text-align: right;
+    background-color: #444;
+    color: #fff;
+    overflow-x: auto;
+    min-height: 2rem;
+    line-height: 2rem;
+}
+
+.buttons {
+    display: grid;
+    grid-template-rows: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+button {
+    background-color: #555;
+    color: #fff;
+    padding: 15px;
+    border: none;
+    border-radius: 5px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #666;
+}
+
+button[data-operator] {
+    background-color: #f9a03f;
+}
+
+button[data-operator]:hover {
+    background-color: #f08f2e;
+}
+
+button[data-clear] {
+    background-color: #d9534f;
+}
+
+button[data-clear]:hover {
+    background-color: #c9302c;
+}
+
+button[data-equals] {
+    background-color: #5cb85c;
+}
+
+button[data-equals]:hover {
+    background-color: #4cae4c;
+}
+
+button:active {
+    background-color: #777;
+}
+
+.display::before {
+    content: attr(data-display);
+}
+
+button[data-value]:active ~ .display {
+    --current-value: attr(data-display);
+    --new-value: calc(var(--current-value) * 10 + attr(data-value));
+    data-display: var(--new-value);
+}
+
+button[data-clear]:active ~ .display {
+    data-display: "0";
+}
+
+button[data-operator]:active ~ .display {
+    --current-value: attr(data-display);
+    data-display: "";
+}
