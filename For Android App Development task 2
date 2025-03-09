@@ -1,0 +1,139 @@
+import tkinter as tk
+from tkinter import messagebox, simpledialog, ttk
+import time
+import threading
+from datetime import datetime
+from winsound import Beep
+import json
+
+class SmartAlarmClock:
+    def __init__(self):
+        self.alarms = self._load_alarms()
+        self.running = True
+        self.root = tk.Tk()
+        self.root.title("Smart Alarm Clock")
+        self.root.geometry("420x450")
+        self.root.resizable(False, False)
+
+        self._create_ui()
+        self._start_clock()
+        self._start_alarm_thread()
+
+    def _create_ui(self):
+        style = ttk.Style(self.root)
+        style.theme_use('clam')
+
+        self.time_label = ttk.Label(self.root, font=('Digital-7', 48), anchor='center')
+        self.time_label.pack(pady=20, fill=tk.X)
+
+        self.new_alarm_button = ttk.Button(self.root, text="New Alarm", command=self._new_alarm_dialog)
+        self.new_alarm_button.pack(pady=10)
+
+        self.alarms_listbox = tk.Listbox(self.root, height=8, width=50, selectmode=tk.SINGLE, font=('Courier', 12))
+        self.alarms_listbox.pack(pady=10)
+        self._refresh_alarms()
+
+        self.manage_alarm_button = ttk.Button(self.root, text="Manage Selected Alarm", command=self._manage_selected_alarm)
+        self.manage_alarm_button.pack(pady=10)
+
+    def _start_clock(self):
+        def update_clock():
+            now = datetime.now()
+            self.time_label.config(text=now.strftime("%H:%M:%S"))
+            self.root.after(1000, update_clock)
+        update_clock()
+
+    def _start_alarm_thread(self):
+        def alarm_checker():
+            while self.running:
+                now = datetime.now()
+                for alarm in self.alarms:
+                    if alarm['active'] and alarm['time'].strftime("%H:%M") == now.strftime("%H:%M"):
+                        self._trigger_alarm(alarm)
+                time.sleep(60)
+        threading.Thread(target=alarm_checker, daemon=True).start()
+
+    def _new_alarm_dialog(self):
+        time_str = simpledialog.askstring("New Alarm", "Enter time (HH:MM):")
+        label = simpledialog.askstring("New Alarm", "Enter label:")
+        if time_str and label:
+            try:
+                alarm_time = datetime.strptime(time_str, "%H:%M")
+                self.alarms.append({'time': alarm_time, 'label': label, 'active': True})
+                self.alarms.sort(key=lambda x: x['time'])
+                self._save_alarms()
+                self._refresh_alarms()
+            except ValueError:
+                messagebox.showerror("Error", "Invalid time format.")
+
+    def _manage_selected_alarm(self):
+        selected = self.alarms_listbox.curselection()
+        if selected:
+            alarm = self.alarms[selected[0]]
+            self._manage_alarm_dialog(alarm)
+
+    def _manage_alarm_dialog(self, alarm):
+        manage_window = tk.Toplevel(self.root)
+        manage_window.title(f"Manage: {alarm['label']}")
+
+        ttk.Label(manage_window, text=f"Time: {alarm['time'].strftime('%H:%M')}").pack(pady=5)
+        ttk.Label(manage_window, text=f"Label: {alarm['label']}").pack(pady=5)
+
+        toggle_button = ttk.Button(manage_window, text="Toggle Active", command=lambda: self._toggle_alarm(alarm))
+        toggle_button.pack(pady=5)
+        delete_button = ttk.Button(manage_window, text="Delete Alarm", command=lambda: self._delete_alarm(alarm))
+        delete_button.pack(pady=5)
+
+    def _toggle_alarm(self, alarm):
+        alarm['active'] = not alarm['active']
+        self._save_alarms()
+        self._refresh_alarms()
+
+    def _delete_alarm(self, alarm):
+        self.alarms.remove(alarm)
+        self._save_alarms()
+        self._refresh_alarms()
+
+    def _trigger_alarm(self, alarm):
+        alarm_window = tk.Toplevel(self.root)
+        alarm_window.title("ALARM!")
+
+        ttk.Label(alarm_window, text=f"Wake up! {alarm['label']}", font=('Helvetica', 18)).pack(pady=20)
+        snooze_button = ttk.Button(alarm_window, text="Snooze (5 min)", command=lambda: self._snooze_alarm(alarm, alarm_window))
+        snooze_button.pack(pady=5)
+        dismiss_button = ttk.Button(alarm_window, text="Dismiss", command=lambda: self._dismiss_alarm(alarm, alarm_window))
+        dismiss_button.pack(pady=5)
+        Beep(1000, 1000)
+
+    def _snooze_alarm(self, alarm, alarm_window):
+        alarm['time'] = alarm['time'].replace(minute=alarm['time'].minute + 5)
+        self._save_alarms()
+        self._refresh_alarms()
+        alarm_window.destroy()
+
+    def _dismiss_alarm(self, alarm, alarm_window):
+        alarm['active'] = False
+        self._save_alarms()
+        self._refresh_alarms()
+        alarm_window.destroy()
+
+    def _refresh_alarms(self):
+        self.alarms_listbox.delete(0, tk.END)
+        for alarm in self.alarms:
+            status = "Active" if alarm['active'] else "Inactive"
+            self.alarms_listbox.insert(tk.END, f"{alarm['time'].strftime('%H:%M')} - {alarm['label']} ({status})")
+
+    def _save_alarms(self):
+        with open("alarms.json", "w") as f:
+            json.dump([{'time': alarm['time'].strftime("%H:%M"), 'label': alarm['label'], 'active': alarm['active']} for alarm in self.alarms], f)
+
+    def _load_alarms(self):
+        try:
+            with open("alarms.json", "r") as f:
+                return [{'time': datetime.strptime(alarm['time'], "%H:%M"), 'label': alarm['label'], 'active': alarm['active']} for alarm in json.load(f)]
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+
+if __name__ == "__main__":
+    app = SmartAlarmClock()
+    app.root.mainloop()
